@@ -8,8 +8,13 @@ namespace SetupApiParser.Model
 {
     public class LogEntry
     {
-        public string Prefix { get; set; }
-        public string Category { get; set; }
+        public EntryPrefix Prefix { get; set; }
+        public EventCategory Category { get; set; }
         public string Message { get; set; }
+
+        public override string ToString()
+        {
+            return $"{Prefix} {Category} {Message}";
+        }
     }
 }

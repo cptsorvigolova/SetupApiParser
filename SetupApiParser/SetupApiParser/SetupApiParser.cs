@@ -12,7 +12,7 @@ namespace SetupApiParser
         public DeviceInstallLog Parse(string setupApiDevLog)
         {
             var result = new DeviceInstallLog();
-            setupApiDevLog = setupApiDevLog.Replace("\r","");
+            setupApiDevLog = setupApiDevLog.Replace("\r", "");
             var lines = setupApiDevLog.Split('\n');
             var i = 0;
             var parameters = new Dictionary<string, string>();
@@ -28,20 +28,12 @@ namespace SetupApiParser
             }
             result.Parameters = parameters;
             result.BootSessions = new List<BootSession>();
-            while (i < lines.Length - 1)
+            var bootSections = Constants.BootSessionRegex.Matches(setupApiDevLog).Select(x => x.Value);
+            foreach (var boot in bootSections)
             {
-                i++;
-                if (Constants.BootSessionHeaderRegex.IsMatch(lines[i]))
-                {
-                    var startLine = i - 1;
-                    while (i < lines.Length - 1 && !Constants.BootSessionHeaderRegex.IsMatch(lines[i + 1]))
-                    {
-                        i++;
-                    }
-                    var toTake = i - 1 - startLine;
-                    result.BootSessions.Add(ParseBootSession(string.Join("\n", lines.Skip(startLine).Take(toTake))));
-                }
+                result.BootSessions.Add(ParseBootSession(boot));
             }
+
             return result;
         }
 
@@ -49,7 +41,8 @@ namespace SetupApiParser
         {
             var result = new BootSession();
             result.BootDate = DateTime.Parse(Constants.DateTimeRegex.Match(bootSession).Value);
-            var sections = Constants.SectionRegex.Matches(bootSession).Skip(1).Select(x => x.Value.Split('\n')).ToList();
+            var parsed = Constants.SectionRegex.Matches(bootSession);
+            var sections = parsed.Select(x => x.Value.Trim().Split('\n')).ToList();
             result.Sections = sections.Select(x => ParseSection(x)).ToList();
             return result;
         }
@@ -62,36 +55,40 @@ namespace SetupApiParser
             var last = section.Length - 1;
             result.End = DateTime.Parse(Constants.DateTimeRegex.Match(section[last - 1]).Value);
             result.ExitStatus = section[last].Substring(5);
+            var process = section[2].Trim().Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
+            result.Process = process[1];
+            result.ProcessParams = process.Length > 2 ? process[2] : string.Empty;
             var entries = new List<LogEntry>();
-            foreach (var e in section.Skip(2).Take(last - 3))
+            foreach (var e in section.Skip(3).Take(last - 3))
             {
-                entries.Add(ParseEntry(e));
+                entries.Add(ParseEvent(e));
             }
             result.Entries = entries;
             return result;
         }
 
-        private LogEntry ParseEntry(string entry)
+        private LogEntry ParseEvent(string entry)
         {
             var result = new LogEntry();
             var prefix = entry.Substring(0, 4);
-            if (Constants.EntryPrefixes.ContainsKey(prefix))
+            if (Mapping.EntryPrefixes.ContainsKey(prefix))
             {
-                result.Prefix = Constants.EntryPrefixes[prefix];
+                result.Prefix = Mapping.EntryPrefixes[prefix];
             }
             else
             {
-                result.Prefix = prefix;
+                result.Prefix = EntryPrefix.Unknown;
             }
-            var category = entry.Substring(4, 5);
-            if (Constants.EntryCategories.ContainsKey(category))
+            var category = entry.Substring(5, 5);
+            if (Mapping.EventCategories.ContainsKey(category))
             {
-                result.Category = Constants.EntryCategories[category];
-                result.Message = entry.Substring(9);
+                result.Category = Mapping.EventCategories[category];
+                result.Message = entry.Substring(10);
             }
             else
             {
-                result.Message = entry.Substring(4);
+                result.Category = EventCategory.Unknown;
+                result.Message = entry.Substring(5);
             }
             return result;
         }

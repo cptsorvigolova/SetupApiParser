@@ -13,5 +13,12 @@ namespace SetupApiParser.Model
         public DateTime End { get; set; }
         public List<LogEntry> Entries { get; set; }
         public string ExitStatus { get; set; }
+        public string Process { get; set; }
+        public string ProcessParams { get; set; }
+
+        public override string ToString()
+        {
+            return $"{Header} {Process} {ProcessParams}";
+        }
     }
 }
